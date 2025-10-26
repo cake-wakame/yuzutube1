@@ -4,9 +4,9 @@ import requests
 import datetime
 import urllib.parse
 from pathlib import Path 
-from typing import Union
+from typing import Union, List, Dict, Any # 追加: 型ヒント用
 import asyncio 
-from fastapi import FastAPI, Response, Request, Cookie, Form # Formをインポート
+from fastapi import FastAPI, Response, Request, Cookie, Form 
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -156,17 +156,79 @@ def formatSearchData(data_dict, failed="Load Failed"):
         return {"type": "channel", "author": data_dict.get("author", failed), "id": data_dict.get("authorId", failed), "thumbnail": thumbnail}
     return {"type": "unknown", "data": data_dict}
 
+# --- 変更開始: Invidious APIからのストリームURL取得ロジックに修正 ---
+
+def _get_invidious_streams(t: Dict[str, Any]) -> Dict[str, Union[str, None]]:
+    """
+    Invidious APIの動画データから、最高画質の動画/音声URLと360p相当の単一URLを抽出する。
+    """
+    video_formats = t.get('formatStreams', [])
+    adaptive_formats = t.get('adaptiveFormats', [])
+    
+    high_quality_video_url = None
+    high_quality_audio_url = None
+    standard_video_url = None # 360p相当の音声付き単一ファイル
+    
+    # 1. 最高画質の動画ストリーム（音声なし）と音声ストリーム（映像なし）を抽出 (adaptiveFormats)
+    # 動画ストリーム (acodec="none")
+    video_only_streams = sorted(
+        [f for f in adaptive_formats if f.get('acodec') == 'none' and f.get('vcodec') != 'none'],
+        key=lambda x: int(x.get('height', 0)),
+        reverse=True
+    )
+    if video_only_streams:
+        # 最も高い解像度（height）の動画URLを取得
+        high_quality_video_url = video_only_streams[0].get('url')
+        
+    # 音声ストリーム (vcodec="none")
+    # M4A (itag 140) を優先するなど、互換性の高いものを選択
+    audio_only_streams = sorted(
+        [f for f in adaptive_formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none'],
+        key=lambda x: int(x.get('bitrate', 0)), # ビットレートが高いものを優先
+        reverse=True
+    )
+    if audio_only_streams:
+        # 最も高いビットレートの音声URLを取得
+        high_quality_audio_url = audio_only_streams[0].get('url')
+
+    # 2. 360p相当の音声付き単一ファイル (formatStreams)
+    # 通常 formatStreams には低〜中画質の音声付きファイルが含まれる。
+    # 360p (itag 18) またはそれに近いものを探す。
+    standard_streams = sorted(
+        [f for f in video_formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none'],
+        key=lambda x: int(x.get('height', 0)),
+        reverse=True
+    )
+    
+    # 360p (height 360) を探す
+    target_360p = next((f for f in standard_streams if f.get('height') == 360), None)
+    if target_360p:
+        standard_video_url = target_360p.get('url')
+    elif standard_streams:
+        # 見つからない場合は、最も低い画質の一つ（フォールバック）
+        standard_video_url = standard_streams[-1].get('url')
+
+    return {
+        "high_quality_video_url": high_quality_video_url,
+        "high_quality_audio_url": high_quality_audio_url,
+        "standard_video_url": standard_video_url, # 360p相当
+    }
+
 async def getVideoData(videoid):
     t_text = await run_in_threadpool(requestAPI, f"/videos/{urllib.parse.quote(videoid)}", invidious_api.video)
     t = json.loads(t_text)
     recommended_videos = t.get('recommendedvideo') or t.get('recommendedVideos') or []
     
-    # InvidiousのフォールバックURL
-    fallback_videourls = list(reversed([i["url"] for i in t["formatStreams"]]))[:2]
+    # InvidiousからストリームURLを抽出する
+    stream_urls = _get_invidious_streams(t)
     
     # データを整理して返す
     return [{
-        'video_urls': fallback_videourls, 
+        # 'video_urls'は、互換性のために、360p相当のストリームURLを優先し、
+        # もしあればInvidiousが提供するfallback_videourls（おそらく低画質）を続ける。
+        'video_urls': [stream_urls["standard_video_url"]] if stream_urls["standard_video_url"] else list(reversed([i["url"] for i in t["formatStreams"]]))[:2], 
+        'high_quality_video_url': stream_urls["high_quality_video_url"],
+        'high_quality_audio_url': stream_urls["high_quality_audio_url"],
         'description_html': t["descriptionHtml"].replace("\n", "<br>"), 'title': t["title"],
         'length_text': str(datetime.timedelta(seconds=t["lengthSeconds"])), 'author_id': t["authorId"], 'author': t["author"], 'author_thumbnails_url': t["authorThumbnails"][-1]["url"], 'view_count': t["viewCount"], 'like_count': t["likeCount"], 'subscribers_count': t["subCountText"]
     }, [
@@ -242,147 +304,11 @@ async def getCommentsData(videoid):
     t_text = await run_in_threadpool(requestAPI, f"/comments/{urllib.parse.quote(videoid)}", invidious_api.comments)
     t = json.loads(t_text)["comments"]
     return [{"author": i["author"], "authoricon": i["authorThumbnails"][-1]["url"], "authorid": i["authorId"], "body": i["contentHtml"].replace("\n", "<br>")} for i in t]
-# --- New Helper ---
 
+# --- 削除されたヘルパー関数 (get_360p_single_url, fetch_high_quality_streams) ---
+# 外部APIへの依存をなくすため、これらの関数は削除されました。
 
-def get_360p_single_url(videoid: str) -> str:
-    """
-    外部APIから音声付きの360p単一ファイルのURLを抽出して返す (itag 18 優先)。
-    """
-    YTDL_API_URL = f"https://ytdlp-cache.vercel.app/dl/{videoid}"
-    
-    try:
-        res = requests.get(
-            YTDL_API_URL, 
-            headers=getRandomUserAgent(), 
-            timeout=max_api_wait_time
-        )
-        res.raise_for_status()
-        data = res.json()
-        
-        formats: List[Dict[str, Any]] = data.get("res_data", {}).get("formats", [])
-        if not formats:
-            raise ValueError("External API response is missing video formats.")
-            
-        # 1. itag 18 を探し、映像と音声の両方があることを確認
-        target_format = next((
-            f for f in formats 
-            if f.get("itag") == 18 and 
-               f.get("vcodec") != "none" and 
-               f.get("acodec") != "none"
-        ), None)
-        
-        if not target_format:
-            # 2. itag 18 が見つからない場合、"360p" を含み音声付きのものを探す（フォールバック）
-            target_format = next((
-                f for f in formats 
-                if "360p" in f.get("quality", "") and 
-                   f.get("vcodec") != "none" and 
-                   f.get("acodec") != "none"
-            ), None)
-
-        if not target_format or not target_format.get("url"):
-            raise ValueError("Could not find a single 360p stream with audio (itag 18 or similar).")
-            
-        return target_format["url"]
-
-    except requests.exceptions.RequestException as e:
-        # ネットワークまたはタイムアウトエラー
-        raise APITimeoutError(f"Error connecting to external API: {e}") from e
-    except (ValueError, json.JSONDecodeError) as e:
-        # JSON解析またはデータ不足エラー
-        raise ValueError(f"Error processing external stream API response: {e}") from e
-
-
-def fetch_high_quality_streams(videoid: str) -> dict:
-    """
-    外部APIから動画データを取得し、1080pの動画URL（音声なし）と、
-    iPad互換性を考慮した最高音質（M4A/AAC）の音声URLを抽出して返す。
-    
-    前提: requests, json, getRandomUserAgent, max_api_wait_time, APITimeoutError 
-          は外部で定義/インポートされていること。
-    """
-    YTDL_API_URL = f"https://ytdlp-cache.vercel.app/dl/{videoid}"
-    
-    try:
-        res = requests.get(
-            YTDL_API_URL, 
-            headers=getRandomUserAgent(), 
-            timeout=max_api_wait_time
-        )
-        res.raise_for_status()
-        data = res.json()
-        
-        formats = data.get("res_data", {}).get("formats", [])
-        if not formats:
-            raise ValueError("External API response is missing video formats.")
-            
-        # 画質文字列を比較可能なスコアに変換
-        def get_video_quality_score(f):
-            quality_str = f.get("quality", "0").lower().replace("p", "").replace("p60", "60").replace("p30", "30").replace("high", "0")
-            try:
-                # フレームレート考慮 (例: 1080p60 > 1080p30)
-                if "60" in quality_str:
-                    return int(quality_str.replace("60", "")) * 100 + 60
-                else:
-                    return int(quality_str) * 100 + 30
-            except ValueError:
-                return 0
-            
-        # 1. 動画ストリーム（音声なし）の抽出とソート (1080p優先)
-        video_formats = [f for f in formats if f.get("acodec") == "none" and f.get("vcodec") != "none"]
-        video_formats.sort(key=get_video_quality_score, reverse=True)
-        
-        high_quality_video_url = None
-        
-        # 1080pのストリームを優先的に探す
-        target_1080p_formats = [f for f in video_formats if "1080" in f.get("quality", "")]
-        
-        if target_1080p_formats:
-            # 1080pが存在すれば、その中で最高の品質を選択（ソート済みのため先頭）
-            high_quality_video_url = target_1080p_formats[0]["url"]
-        elif video_formats:
-            # 1080pがない場合は、利用可能な最高画質を選択
-            high_quality_video_url = video_formats[0]["url"]
-            
-        # 2. 音声ストリーム（映像なし）の抽出と選択 (M4A/AACを優先)
-        
-        # iPad互換性の高いM4Aコンテナ (acodec=aac, ext=m4a) のストリームをフィルタリング
-        # YouTubeの単体音声ストリームは通常この形式
-        audio_formats_m4a = [
-            f for f in formats 
-            if f.get("vcodec") == "none" and 
-               f.get("acodec") != "none" and 
-               f.get("ext") == "m4a"
-        ]
-        
-        high_quality_audio_url = None
-        
-        if audio_formats_m4a:
-            # M4A/AACがあれば、ファイルサイズ（ビットレートの代理指標）でソートし、最高音質を選択
-            audio_formats_m4a.sort(key=lambda x: int(x.get("filesize", 0) or 0), reverse=True)
-            high_quality_audio_url = audio_formats_m4a[0]["url"]
-        else:
-            # M4A/AACがない場合、他の利用可能な最高音質（元のロジック）を選択
-            audio_formats_other = [f for f in formats if f.get("vcodec") == "none" and f.get("acodec") != "none"]
-            audio_formats_other.sort(key=lambda x: int(x.get("filesize", 0) or 0), reverse=True)
-            high_quality_audio_url = audio_formats_other[0]["url"] if audio_formats_other else None
-        
-        if not high_quality_video_url or not high_quality_audio_url:
-            raise ValueError("Could not find both high-quality video and audio streams.")
-            
-        return {
-            "video_url": high_quality_video_url, 
-            "audio_url": high_quality_audio_url,
-            "title": data.get("res_data", {}).get("title", "Video")
-        }
-
-    except requests.exceptions.HTTPError as e:
-        raise APITimeoutError(f"External stream API returned HTTP error: {e.response.status_code}") from e
-    except (requests.exceptions.RequestException, ValueError, json.JSONDecodeError) as e:
-        raise APITimeoutError(f"Error processing external stream API response: {e}") from e
-        
-# 新規追加: /api/edu から呼び出す外部APIヘルパー関数
+# 新規追加: /api/edu から呼び出す外部APIヘルパー関数 (この関数は維持)
 async def fetch_embed_url_from_external_api(videoid: str) -> str:
     """
     外部ストリームAPIを呼び出し、埋め込みURLを取得する（requestsは同期のためスレッドプールで実行）
@@ -432,21 +358,28 @@ async def get_edu_key_route():
     else:
         return Response(content='{"error": "Failed to retrieve key from Kahoot API"}', media_type="application/json", status_code=500)
 
-# 新規追加: /api/stream_high/{videoid} ルート (最高画質埋め込み)
+# 変更: /api/stream_high/{videoid} ルート (最高画質埋め込み)
 @app.get('/api/stream_high/{videoid}', response_class=HTMLResponse)
 async def embed_high_quality_video(request: Request, videoid: str, proxy: Union[str] = Cookie(None)):
     """
     /api/stream_high/<videoid> ルート。
-    外部APIから最高画質の動画URL（音声なし）と最高音質の音声URLを取得し、
+    Invidious APIから最高画質の動画URL（音声なし）と最高音質の音声URLを取得し、
     それらを埋め込んだ全画面表示用の HTML ページを返します。
     """
     try:
-        # 外部APIから最高画質のストリームURLを取得
-        stream_data = await run_in_threadpool(fetch_high_quality_streams, videoid)
+        video_data = await getVideoData(videoid)
+        stream_data = video_data[0]
+        
+        video_url = stream_data.get("high_quality_video_url")
+        audio_url = stream_data.get("high_quality_audio_url")
+        video_title = stream_data.get("title", "Video")
+        
+        if not video_url or not audio_url:
+             return Response("Could not find high-quality video or audio stream from Invidious API.", status_code=503)
         
     except APITimeoutError as e:
-        print(f"Error calling external stream API: {e}")
-        return Response(f"Failed to retrieve high-quality stream URL", status_code=503)
+        print(f"Error calling Invidious API: {e}")
+        return Response(f"Failed to retrieve high-quality stream URL from Invidious.", status_code=503)
         
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
@@ -457,23 +390,29 @@ async def embed_high_quality_video(request: Request, videoid: str, proxy: Union[
         'embed_high.html', 
         {
             "request": request, 
-            "video_url": stream_data["video_url"],
-            "audio_url": stream_data["audio_url"],
-            "video_title": stream_data["title"],
+            "video_url": video_url,
+            "audio_url": audio_url,
+            "video_title": video_title,
             "videoid": videoid,
             "proxy": proxy
         }
     )
 
+# 変更: /api/stream_360p_url/{videoid} ルート (360p単一ファイルURL)
 @app.get("/api/stream_360p_url/{videoid}")
 async def get_360p_stream_url_route(videoid: str):
-    """360p音声付き単一ファイルのURLをJSONで返す"""
+    """Invidious APIから取得した360p相当の音声付き単一ファイルのURLをJSONで返す"""
     try:
-        # ネットワークI/Oをスレッドプールに任せる
-        url = await run_in_threadpool(get_360p_single_url, videoid)
-        return {"stream_url": url}
+        video_data = await getVideoData(videoid)
+        standard_url = video_data[0].get('video_urls', [None])[0] # getVideoDataのvideo_urlsの最初の要素（360p相当）を取得
+        
+        if standard_url:
+            return {"stream_url": standard_url}
+        else:
+            return Response(content='{"error": "Failed to find 360p stream from Invidious API"}', media_type="application/json", status_code=404)
+            
     except Exception as e:
-        return Response(content=f'{{"error": "Failed to get 360p URL: {e}"}}', media_type="application/json", status_code=503)
+        return Response(content=f'{{"error": "Failed to get stream URL: {e}"}}', media_type="application/json", status_code=503)
 
 # 新規追加: /api/edu/{videoid} ルート (全画面埋め込み)
 @app.get('/api/edu/{videoid}', response_class=HTMLResponse)
@@ -485,6 +424,7 @@ async def embed_edu_video(request: Request, videoid: str, proxy: Union[str] = Co
     embed_url = None
     try:
         # 外部APIから埋め込みURLを取得
+        # Note: このルートは指示通り、既存の外部API (siawaseok.duckdns.org) に依存し続けます。
         embed_url = await fetch_embed_url_from_external_api(videoid)
         
     except requests.exceptions.HTTPError as e:
@@ -566,7 +506,8 @@ async def access_gate_post(request: Request, access_code: str = Form(...)):
 async def video(v:str, request: Request, proxy: Union[str] = Cookie(None)):
     video_data = await getVideoData(v)
     
-    high_quality_url = ""
+    # 修正: getVideoDataの返り値からhigh_quality_video_urlを取得
+    high_quality_url = video_data[0].get("high_quality_video_url", "")
     
     return templates.TemplateResponse('video.html', {
         "request": request, "videoid": v, "videourls": video_data[0]['video_urls'], 
