@@ -244,20 +244,20 @@ def get_fallback_hls_url(videoid: str) -> str:
             timeout=max_api_wait_time
         )
         res.raise_for_status()
-        data = res.json()
         
+        # 修正: JSONとしてデコードする代わりに、応答テキスト全体をHLS URLとして取得する
+        hls_url = res.text.strip()
         
-        hls_url = data.get("hlsUrl")
-        
-        if not hls_url:
-            raise ValueError("Fallback API response is missing the 'hlsUrl' field.")
+        # 応答が空でないか、または適切なHLSマニフェストURLの形式であることを確認
+        if not hls_url or not hls_url.startswith("https://manifest.googlevideo.com/api/manifest/hls_variant"):
+            raise ValueError("Fallback API response is not a valid HLS URL.")
             
         return hls_url
 
     except requests.exceptions.HTTPError as e:
         
         raise APITimeoutError(f"Fallback HLS API returned HTTP error: {e.response.status_code}") from e
-    except (requests.exceptions.RequestException, json.JSONDecodeError, ValueError) as e:
+    except (requests.exceptions.RequestException, ValueError) as e:
         
         raise APITimeoutError(f"Error processing fallback HLS API response: {e}") from e
 
