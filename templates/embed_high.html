@@ -26,68 +26,14 @@
             object-fit: contain;
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
     <div id="video-container">
-        <video id="video-player" controls playsinline></video> 
+        <video id="video-player" controls playsinline src="{{ video_url }}">
+            ブラウザがこの形式の動画ストリームをサポートしていません。
+            (この動画はHLS形式ですが、お使いのブラウザはネイティブHLS再生に対応していない可能性があります。)
+        </video>
     </div>
 
-    <script>
-        const video = document.getElementById('video-player');
-        // バックエンドから渡されるHLSマニフェストURL
-        const hlsUrl = "{{ video_url }}"; 
-        
-        // --- hls.js による HLS (m3u8) ストリームの再生 ---
-
-        if (Hls.isSupported()) {
-            const hls = new Hls();
-            
-            // hls.js がストリームURLを読み込み、Video要素にアタッチする
-            hls.loadSource(hlsUrl);
-            hls.attachMedia(video);
-            
-            hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                // HLSマニフェストがパースされたら、自動再生を試みる
-                // ブラウザのポリシーにより失敗する可能性があるため、catchでエラーを握りつぶす
-                video.play().catch(e => {
-                    console.log("Autoplay failed. User interaction is required.");
-                    // iOSなどの環境では、`playsinline`があってもミュートでないと自動再生できないことがある
-                    // ここではユーザーに操作してもらうことを優先し、エラー表示はしない
-                });
-            });
-            
-            hls.on(Hls.Events.ERROR, function (event, data) {
-                if (data.fatal) {
-                    console.error('HLS Fatal Error:', data.details, data.error);
-                    // 致命的なエラーが発生した場合、フォールバックとしてネイティブ再生を試みる
-                    switch (data.type) {
-                        case Hls.ErrorTypes.NETWORK_ERROR:
-                            hls.startLoad(); // リロードを試みる
-                            break;
-                        case Hls.ErrorTypes.MEDIA_ERROR:
-                            hls.recoverMediaError(); // エラーからの回復を試みる
-                            break;
-                        default:
-                            // それでもダメならネイティブ再生へフォールバック (HLS URLがネイティブ対応している場合のみ)
-                            video.src = hlsUrl;
-                            video.load();
-                            video.play().catch(e => console.error("Native playback failed:", e));
-                            break;
-                    }
-                }
-            });
-            
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // HLS.jsがサポートされていないが、ブラウザがネイティブHLSをサポートしている場合 (Safariなど)
-            video.src = hlsUrl;
-            video.addEventListener('loadedmetadata', function() {
-                video.play().catch(e => console.log("Native Autoplay failed."));
-            });
-        } else {
-            // どちらもサポートされていない場合のメッセージ
-            video.innerHTML = 'ブラウザがHLSストリームの再生をサポートしていません。';
-        }
-    </script>
-</body>
+    </body>
 </html>
