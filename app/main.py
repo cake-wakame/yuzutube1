@@ -315,53 +315,8 @@ def get_360p_single_url(videoid: str) -> str:
             raise ValueError(f"Fallback HLS API failed: {fallback_e}") from fallback_e
 
 
-def fetch_high_quality_streams(videoid: str) -> dict:
-    
-    # 変更: 高画質再生の外部APIをhttps://server-thxk.onrender.com/high/{videoid}に変更
-    YTDL_API_URL = f"https://server-thxk.onrender.com/high/{videoid}"
-    
-    try:
-        res = requests.get(
-            YTDL_API_URL, 
-            headers=getRandomUserAgent(), 
-            timeout=max_api_wait_time
-        )
-        res.raise_for_status()
-        data = res.json()
-        
-        # 応答例に基づいて、最高画質の動画URLと音声URLを抽出
-        # HLSマニフェストURLが返されるが、高画質再生用テンプレート(embed_high.html)は
-        # 過去のバージョンでは分離されたストリームURLを要求していたため、
-        # ここでは便宜上、m3u8をそのまま返すように変更、または
-        # HLSマニフェストURLを「動画URL」として使用し、音声URLは空のままにする。
-        # 今回のAPIのレスポンス例から、分離された動画/音声URLは確認できないため、
-        # HLS (m3u8) URLを返すようにロジックを調整します。
-        
-        hls_url = data.get("m3u8Url")
-        
-        # HLS URLが存在しない、または適切でない場合はエラーとする
-        if not hls_url:
-            raise ValueError("Could not find m3u8Url in the external high-quality stream API response.")
-            
-        
-        # テンプレートに渡すデータ形式に合わせる
-        # テンプレート(embed_high.html)が動画URLと音声URLを別々に受け取る前提なら、
-        # ここではHLSを両方に渡すか、テンプレート側をHLS対応にする必要がある。
-        # 現状のコードの整合性を保つため、最高画質のHLS URLを`video_url`として返します。
-        # `audio_url`は使用しない（HLSマニフェストは両方を含むため）。
-        return {
-            "video_url": hls_url, # HLS (m3u8) マニフェストURL
-            "audio_url": "", # HLSには動画と音声が含まれるため、音声URLは空にする
-            "title": f"{data.get('resolution', 'High Quality')} Stream for {videoid}" 
-        }
 
-    except requests.exceptions.HTTPError as e:
-        # HTTP 4xx, 5xx エラーの場合
-        raise APITimeoutError(f"External stream API returned HTTP error: {e.response.status_code}") from e
-    except (requests.exceptions.RequestException, ValueError, json.JSONDecodeError) as e:
-        # 接続エラー、JSONデコードエラー、ValueErrorの場合
-        raise APITimeoutError(f"Error processing external stream API response: {e}") from e
-        
+
 async def fetch_embed_url_from_external_api(videoid: str) -> str:
     
     
