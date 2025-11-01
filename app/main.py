@@ -245,10 +245,8 @@ def get_fallback_hls_url(videoid: str) -> str:
         )
         res.raise_for_status()
         
-        # 応答テキスト全体をHLS URLとして取得する
         hls_url = res.text.strip()
         
-        # 応答が空でないか、または適切なHLSマニフェストURLの形式であることを確認
         if not hls_url or not hls_url.startswith("https://manifest.googlevideo.com/api/manifest/hls_variant"):
             raise ValueError("Fallback API response is not a valid HLS URL.")
             
@@ -263,7 +261,6 @@ def get_fallback_hls_url(videoid: str) -> str:
 
 def get_360p_single_url(videoid: str) -> str:
     
-    # 変更: 通常再生の外部APIをhttps://server-thxk.onrender.com/stream/{videoid}に変更
     YTDL_API_URL = f"https://server-thxk.onrender.com/stream/{videoid}"
     
     
@@ -276,18 +273,15 @@ def get_360p_single_url(videoid: str) -> str:
         res.raise_for_status()
         data = res.json()
         
-        # 応答例に合わせて、formatsリストからitag '18' のURLを探す
         formats: List[Dict[str, Any]] = data.get("formats", [])
         if not formats:
             
             raise ValueError("External API response is missing video formats.")
             
         
-        # itagが18で、動画と音声の両方を含むフォーマットを探す (360p)
-        # 新しいAPI応答例ではitagが文字列として返されるため、"18"で比較
         target_format = next((
             f for f in formats 
-            if f.get("itag") == "18" and f.get("videoUrl") # itag '18' と 'videoUrl' が存在することを確認
+            if f.get("itag") == "18" and f.get("videoUrl") 
         ), None)
         
         if target_format and target_format.get("videoUrl"):
@@ -295,7 +289,6 @@ def get_360p_single_url(videoid: str) -> str:
             return target_format["videoUrl"]
             
         
-        # 以前のフォールバックロジック（HLS）は削除されましたが、ここではエラーメッセージを更新
         raise ValueError("Could not find a single 360p stream with audio (itag 18) in the main API response.")
 
     except (requests.exceptions.RequestException, ValueError, json.JSONDecodeError) as e:
@@ -303,7 +296,6 @@ def get_360p_single_url(videoid: str) -> str:
         
         
         try:
-            # フォールバックとしてHLS URLを試みる（既存のロジックを保持）
             return get_fallback_hls_url(videoid)
         
         except APITimeoutError as fallback_e:
@@ -315,8 +307,38 @@ def get_360p_single_url(videoid: str) -> str:
             raise ValueError(f"Fallback HLS API failed: {fallback_e}") from fallback_e
 
 
+def fetch_high_quality_streams(videoid: str) -> dict:
+    
+    YTDL_API_URL = f"https://server-thxk.onrender.com/high/{videoid}"
+    
+    try:
+        
+        res = requests.get(
+            YTDL_API_URL, 
+            headers=getRandomUserAgent()
+        )
+        res.raise_for_status()
+        data = res.json()
+        
+        hls_url = data.get("m3u8Url")
+        
+        if not hls_url:
+            raise ValueError("Could not find m3u8Url in the external high-quality stream API response.")
+            
+        
+        return {
+            "video_url": hls_url, 
+            "audio_url": "",      
+            "title": f"{data.get('resolution', 'High Quality')} Stream for {videoid}" 
+        }
 
-
+    except requests.exceptions.HTTPError as e:
+        
+        raise APITimeoutError(f"External stream API returned HTTP error: {e.response.status_code}") from e
+    except (requests.exceptions.RequestException, ValueError, json.JSONDecodeError) as e:
+        
+        raise APITimeoutError(f"Error processing external stream API response: {e}") from e
+        
 async def fetch_embed_url_from_external_api(videoid: str) -> str:
     
     
@@ -369,11 +391,12 @@ async def embed_high_quality_video(request: Request, videoid: str, proxy: Union[
         
     except APITimeoutError as e:
         print(f"Error calling external stream API: {e}")
-        return Response(f"Failed to retrieve high-quality stream URL", status_code=503)
+        return Response(f"Failed to retrieve high-quality stream URL: {e}", status_code=503)
         
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        return Response("An unexpected error occurred while retrieving stream data.", status_code=500)
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        print(f"An unexpected error occurred: {error_detail}")
+        return Response(f"An unexpected error occurred while retrieving stream data. Detail: {error_detail}", status_code=500)
 
     
     return templates.TemplateResponse(
@@ -390,7 +413,7 @@ async def embed_high_quality_video(request: Request, videoid: str, proxy: Union[
 
 @app.get("/api/stream_360p_url/{videoid}")
 async def get_360p_stream_url_route(videoid: str):
-    """360p音声付き単一ファイルのURL (またはHLS URL) をJSONで返す"""
+    
     try:
         
         url = await run_in_threadpool(get_360p_single_url, videoid)
@@ -465,7 +488,7 @@ async def access_gate_post(request: Request, access_code: str = Form(...)):
         response = RedirectResponse(url="/", status_code=302)
         
         expires_time = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)
-        response.set_cookie(key="yuzu_access_granted", value="True", expires=expires_time.strftime("%a, %d-%b-%Y %H:%M:%S GMT"), httponly=True)
+        response.set_cookie(key="yuzu_access_granted", value="True", expires=expires_time.strftime("%a, %d-%b-%Y %H:%M:%S GMT"), httpyuzu_access_grantedly=True)
         return response
     else:
         
@@ -490,7 +513,7 @@ async def video(v:str, request: Request, proxy: Union[str] = Cookie(None)):
 
 @app.get("/search", response_class=HTMLResponse)
 async def search(q:str, request: Request, page:Union[int, None]=1, proxy: Union[str] = Cookie(None)):
-    search_results = await getSearchData(q, page)
+   search_results = await getSearchData(q, page)
     return templates.TemplateResponse("search.html", {"request": request, "results":search_results, "word":q, "next":f"/search?q={q}&page={page + 1}", "proxy":proxy})
 
 @app.get("/hashtag/{tag}")
