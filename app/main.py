@@ -28,6 +28,7 @@ MAX_RETRIES = 10
 RETRY_DELAY = 3.0 
 
 EDU_STREAM_API_BASE_URL = "https://siawaseok.duckdns.org/api/stream/" 
+SHORT_STREAM_API_BASE_URL = "https://yt-dl-kappa.vercel.app/short/"
 
 
 invidious_api_data = {
@@ -342,6 +343,23 @@ def fetch_high_quality_streams(videoid: str) -> dict:
     except (requests.exceptions.RequestException, ValueError, json.JSONDecodeError) as e:
         raise APITimeoutError(f"Error processing external stream API response: {e}") from e
 
+
+async def fetch_short_data_from_external_api(channelid: str) -> Dict[str, Any]:
+    target_url = f"{SHORT_STREAM_API_BASE_URL}{urllib.parse.quote(channelid)}"
+    
+    def sync_fetch():
+        # 最大待機時間を流用
+        res = requests.get(
+            target_url, 
+            headers=getRandomUserAgent(), 
+        )
+        res.raise_for_status() 
+        
+        # 応答をそのままJSONとして返す
+        return res.json()
+
+    return await run_in_threadpool(sync_fetch)
+    
 async def fetch_embed_url_from_external_api(videoid: str) -> str:
     
     
@@ -458,7 +476,40 @@ async def embed_edu_video(request: Request, videoid: str, proxy: Union[str] = Co
             "proxy": proxy
         }
     )
-
+@app.get("/api/short/{channelid}")
+async def get_short_data_route(channelid: str):
+    """
+    外部APIの応答をそのまま返す新しいShortsエンドポイント。
+    """
+    try:
+        data = await fetch_short_data_from_external_api(channelid)
+        # 取得したJSONデータをそのまま返す
+        return data
+        
+    except requests.exceptions.HTTPError as e:
+        # 外部APIからのHTTPエラーをクライアントに返す
+        status_code = e.response.status_code
+        print(f"Error calling external Shorts API (HTTP {status_code}) for {channelid}: {e}")
+        # エラーレスポンスのボディがある場合はそれを使用
+        try:
+            error_content = e.response.text
+        except:
+            error_content = f'{{"error": "External API returned HTTP error: {status_code}"}}'
+            
+        return Response(
+            content=error_content, 
+            media_type=e.response.headers.get("Content-Type", "application/json"),
+            status_code=status_code
+        )
+        
+    except (requests.exceptions.RequestException, ValueError, json.JSONDecodeError) as e:
+        # 接続エラー、タイムアウト、JSONデコードエラーなど
+        print(f"Error calling external Shorts API for {channelid}: {e}")
+        return Response(
+            content=f'{{"error": "Failed to retrieve Shorts data from external service: {e!r}"}}', 
+            media_type="application/json", 
+            status_code=503
+        )
 
 @app.get('/', response_class=HTMLResponse)
 async def home(request: Request, yuzu_access_granted: Union[str] = Cookie(None), proxy: Union[str] = Cookie(None)):
