@@ -361,56 +361,54 @@ def get_360p_single_url(videoid: str) -> str:
     except (requests.exceptions.RequestException, ValueError, json.JSONDecodeError) as e:
         raise APITimeoutError(f"Error processing stream API response for 360p: {e}") from e
 
+def fetch_high_quality_streams(videoid: str) -> Dict[str, str]:
+    API_URL = f"https://ytdl-0et1.onrender.com/m3u8/{videoid}"
 
-def fetch_high_quality_streams(videoid: str) -> dict:
-    """高画質ストリーム (M3U8優先) のURLを取得する"""
-    
     try:
-        formats = get_ytdl_formats(videoid)
+        response = requests.get(API_URL, timeout=15) 
+        response.raise_for_status() 
+        data = response.json()
         
-        # 1. M3U8 (HLS) フォーマットをフィルタリングし、最高画質のものを探す
-        # heightの降順でソートして、一番目の要素 (最高画質) を選ぶ
-        m3u8_formats = sorted(
-            [f for f in formats if f.get('ext') == 'm3u8' and f.get('url')],
-            key=lambda f: int(f.get('height', 0)) if f.get('height') else 0,
+        m3u8_formats = data.get('m3u8_formats', [])
+        
+        if not m3u8_formats:
+             raise ValueError("No M3U8 formats found in the API response.")
+
+        def get_height(f):
+            resolution_str = f.get('resolution', '0x0')
+            try:
+                return int(resolution_str.split('x')[-1]) if 'x' in resolution_str else 0
+            except ValueError:
+                return 0
+
+        m3u8_formats_sorted = sorted(
+            [f for f in m3u8_formats if f.get('url')],
+            key=get_height,
             reverse=True
         )
         
-        if m3u8_formats:
-            best_m3u8 = m3u8_formats[0]
-            # M3U8は結合ストリームなのでaudio_urlは空
+        if m3u8_formats_sorted:
+            best_m3u8 = m3u8_formats_sorted[0]
+            
+            title = data.get("title", f"Stream for {videoid}")
+            resolution = best_m3u8.get('resolution', 'Highest Quality')
+            
             return {
                 "video_url": best_m3u8["url"],
-                "audio_url": "", 
-                "title": f"{best_m3u8.get('resolution', 'Highest Quality M3U8')} Stream for {videoid}"
+                "audio_url": "",
+                "title": f"[{resolution}] Stream for {title}"
             }
 
-        # 2. M3U8がない場合、itag 22 (720p) や itag 18 (360p) のプログレッシブ形式を探す (フォールバック)
-        high_quality_format = next((
-            f for f in formats 
-            if f.get("itag") == "22" and f.get("url") 
-        ), None)
-        
-        if not high_quality_format:
-            high_quality_format = next((
-                f for f in formats 
-                if f.get("itag") == "18" and f.get("url")
-            ), None)
-
-        if high_quality_format and high_quality_format.get("url"):
-            return {
-                "video_url": high_quality_format["url"], 
-                "audio_url": "", 
-                "title": f"{high_quality_format.get('resolution', 'High Quality')} Stream for {videoid}" 
-            }
-            
-        raise ValueError("Could not find any suitable high-quality stream (M3U8 or Progressive) in the API response.")
+        raise ValueError("Could not find any suitable high-quality stream (M3U8) in the API response after sorting.")
 
     except requests.exceptions.HTTPError as e:
-        raise APITimeoutError(f"Stream API returned HTTP error: {e.response.status_code}") from e
-    except (requests.exceptions.RequestException, ValueError, json.JSONDecodeError) as e:
-        raise APITimeoutError(f"Error processing stream API response for high quality: {e}") from e
-
+        raise APITimeoutError(f"Stream API returned HTTP error: {e.response.status_code} for {API_URL}") from e
+    except requests.exceptions.Timeout as e:
+        raise APITimeoutError(f"Stream API request timed out for {API_URL}") from e
+    except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
+        raise APITimeoutError(f"Error processing stream API response: {e}") from e
+    except ValueError as e:
+        raise e
 
 async def fetch_embed_url_from_external_api(videoid: str) -> str:
     
