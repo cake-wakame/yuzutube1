@@ -28,7 +28,7 @@ MAX_RETRIES = 10
 RETRY_DELAY = 3.0 
 
 EDU_STREAM_API_BASE_URL = "https://siawaseok.duckdns.org/api/stream/" 
-EDU_VIDEO_API_BASE_URL = "https://siawaseok.duckdns.org/api/video2/" # 新しいAPIベースURL
+EDU_VIDEO_API_BASE_URL = "https://siawaseok.duckdns.org/api/video2/" # 新しいAPIベースURLを追加
 SHORT_STREAM_API_BASE_URL = "https://yt-dl-kappa.vercel.app/short/"
 
 
@@ -169,14 +169,22 @@ def fetch_video_data_from_edu_api(videoid: str):
 
 def format_related_video(related_data: dict) -> dict:
     
-    if related_data.get("playlistId"):
+    
+    is_playlist = related_data.get("playlistId") and related_data.get("playlistId") != related_data.get("videoId")
+    
+    
+    thumbnail_vid_id = related_data.get('videoId') or related_data.get('playlistId')
+    thumbnail_url = f"https://i.ytimg.com/vi/{thumbnail_vid_id}/sddefault.jpg" if thumbnail_vid_id else failed
+    
+    
+    if is_playlist:
         
         return {
             "type": "playlist",
             "title": related_data.get("title", failed), 
             "id": related_data.get('playlistId', failed),
             "author": related_data.get("channel", failed),
-            "thumbnail_url": f"https://i.ytimg.com/vi/{related_data.get('videoId')}/sddefault.jpg" if related_data.get('videoId') else failed
+            "thumbnail_url": thumbnail_url
         }
     
     return {
@@ -185,10 +193,10 @@ def format_related_video(related_data: dict) -> dict:
         "title": related_data.get("title", failed), 
         "author_id": related_data.get("channelId", failed),
         "author": related_data.get("channel", failed), 
-        "length_text": related_data.get("badge", failed), 
+        "length_text": related_data.get("badge", failed), # 動画の長さ
         "view_count_text": related_data.get("views", failed),
-        "published_text": related_data.get("uploaded", failed),
-        "thumbnail_url": f"https://i.ytimg.com/vi/{related_data['videoId']}/sddefault.jpg" if related_data.get('videoId') else failed
+        "published_text": related_data.get("uploaded", failed), # アップロードからの経過時間
+        "thumbnail_url": thumbnail_url
     }
 
 async def getVideoData(videoid):
@@ -214,7 +222,7 @@ async def getVideoData(videoid):
         'view_count': t.get("views", failed), 
         'like_count': t.get("likes", failed), 
         'subscribers_count': t.get("author", {}).get("subscribers", failed),
-        'published_text': t.get("relativeDate", failed),
+        'published_text': t.get("relativeDate", failed), # 公開日/アップロードからの経過時間
         
     }
     
@@ -569,7 +577,7 @@ async def home(request: Request, yuzu_access_granted: Union[str] = Cookie(None),
         
     return templates.TemplateResponse("index.html", {
         "request": request, 
- "proxy": proxy,
+        "proxy": proxy,
         "results": trending_videos,
         "word": ""
     })
