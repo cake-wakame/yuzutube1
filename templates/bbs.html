@@ -109,11 +109,10 @@
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
         }
-        /* ★ 投稿番号のCSS修正 ★ */
         .post-header {
             display: flex;
             justify-content: space-between;
-            align-items: center; /* 垂直方向中央揃え */
+            align-items: center;
             margin-bottom: 15px;
             padding-bottom: 10px;
             border-bottom: 1px solid #eee;
@@ -129,9 +128,8 @@
             font-size: 1.1em;
             font-weight: 700;
             color: #2c3e50;
-            flex-grow: 1; /* 名前が広がるように */
+            flex-grow: 1;
         }
-        /* ★ CSS修正終了 ★ */
         
         .post-info {
             text-align: right;
@@ -161,6 +159,12 @@
             font-style: italic;
         }
 
+        
+        #enable-enter-submit {
+            transform: scale(1.1);
+            cursor: pointer;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 20px;
@@ -185,6 +189,12 @@
             <h2>メッセージを投稿 </h2>
             <input type="text" id="name" placeholder="名前">
             <textarea id="body" placeholder="本文" required></textarea>
+            
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="enable-enter-submit" checked>
+                <label for="enable-enter-submit" style="color: #4a4a4a; font-size: 14px;">Enterキーで送信を有効にする (Shift+Enterで改行)</label>
+            </div>
+            
             <button type="submit">投稿</button>
         </form>
 
@@ -198,6 +208,21 @@
         const API_BASE_URL = "https://server-bbs.vercel.app"; 
         let lastFetchedCount = 0; 
         const REFRESH_INTERVAL = 5000; 
+        
+        function escapeHTML(str) {
+            if (typeof str !== 'string') return str;
+            return str.replace(/[&<>"']/g, function(match) {
+                switch (match) {
+                    case '&': return '&amp;';
+                    case '<': return '&lt;';
+                    case '>': return '&gt;';
+                    case '"': return '&quot;';
+                    case "'": return '&#39;';
+                    default: return match;
+                }
+            });
+        }
+
 
         async function fetchPosts(forceRefresh = false) {
             const container = document.getElementById('posts-container');
@@ -246,17 +271,20 @@
                         minute: '2-digit',
                         second: '2-digit'
                     });
+                    
+                    const safeName = escapeHTML(post.name || "名無し");
+                    const safeBody = escapeHTML(post.body || "");
 
                     postElement.innerHTML = `
                         <div class="post-header">
                             <span class="post-number">No.${postNumber}</span>
-                            <span class="post-name">${post.name}</span>
+                            <span class="post-name">${safeName}</span>
                             <div class="post-info">
                                 <span>${formattedDate}</span>
                                 <span class="public-id">#${post.public_id}</span>
                             </div>
                         </div>
-                        <div class="post-body">${post.body}</div>
+                        <div class="post-body">${safeBody}</div>
                     `;
                     container.appendChild(postElement);
                 });
@@ -274,6 +302,19 @@
             fetchPosts(true);
             setInterval(fetchPosts, REFRESH_INTERVAL);
         }
+
+        function handleEnterKey(event) {
+            const isEnterSubmitEnabled = document.getElementById('enable-enter-submit').checked;
+            
+            if (event.key === 'Enter' && isEnterSubmitEnabled) {
+                if (!event.shiftKey) {
+                    event.preventDefault();
+                    document.getElementById('post-form').requestSubmit();
+                }
+            }
+        }
+        document.getElementById('body').addEventListener('keydown', handleEnterKey);
+
 
         async function submitPost(event) {
             event.preventDefault();
@@ -307,19 +348,17 @@
                     throw new Error(errorData.detail || `投稿エラー: ${response.status}`);
                 }
 
-                alert('投稿が完了しました！');
                 
-                // 本文のみクリア
-                bodyInput.value = ''; 
+                
 
-                await fetchPosts(true); 
+                await fetchPosts(true);
 
             } catch (error) {
                 console.error("投稿処理エラー:", error);
                 
             } finally {
                 submitButton.disabled = false;
-                submitButton.textContent = '投稿する';
+                submitButton.textContent = '投稿';
             }
         }
 
