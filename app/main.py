@@ -81,8 +81,8 @@ invidious_api_data = {
         'https://invidious.nikkosphere.com/',
         'https://invidious.ducks.party/',
         'https://yt.omada.cafe/',
-        'https://iv.duti.dev/',
         'https://iv.melmac.space/',
+        'https://iv.duti.dev/',
     ]
 }
 
@@ -462,14 +462,20 @@ async def fetch_bbs_posts():
 
     return await run_in_threadpool(sync_fetch)
 
-async def post_new_message(name: str, body: str):
+async def post_new_message(client_ip: str, name: str, body: str): # ★ client_ipを引数に追加
     target_url = f"{BBS_EXTERNAL_API_BASE_URL}/post"
     
     def sync_post():
+        # クライアントIPをX-Forwarded-Forヘッダーに設定して外部BBSサーバーへ転送
+        headers = {
+            **getRandomUserAgent(), 
+            "X-Forwarded-For": client_ip 
+        }
+        
         res = requests.post(
             target_url, 
             json={"name": name, "body": body},
-            headers=getRandomUserAgent(), 
+            headers=headers, # ★ ヘッダーを適用
             timeout=max_api_wait_time
         )
         res.raise_for_status()
@@ -555,10 +561,7 @@ async def embed_edu_video(request: Request, videoid: str, proxy: Union[str] = Co
         
         embed_url = await fetch_embed_url_from_external_api(videoid)
         
-    except requests.exceptions.HTTPError as e:
-        status_code = e.response.status_code
-        if status_code == 404:
-            return Response(f"Stream URL for videoid '{videoid}' not found.", status_code=404)
+    except return Response(f"Stream URL for videoid '{videoid}' not found.", status_code=404)
         
         return Response("Failed to retrieve stream URL from external service (HTTP Error).", status_code=503)
         
@@ -609,6 +612,8 @@ async def get_bbs_posts_route():
 @app.post("/api/bbs/post")
 async def post_new_message_route(request: Request):
     try:
+        # ★ FastAPI側でクライアントIPを取得
+        client_ip = request.headers.get("x-forwarded-for", "unknown").split(',')[0].strip()
         
         data = await request.json()
         name = data.get("name", "")
@@ -617,8 +622,8 @@ async def post_new_message_route(request: Request):
         if not body:
             return Response(content='{"detail": "Body is required"}', media_type="application/json", status_code=400)
 
-        # 投稿処理を外部APIに委譲
-        post_response = await post_new_message(name, body)
+        # 投稿処理を外部APIに委譲し、FastAPI側で取得したclient_ipを渡す
+        post_response = await post_new_message(client_ip, name, body)
         return post_response
         
     except requests.exceptions.HTTPError as e:
