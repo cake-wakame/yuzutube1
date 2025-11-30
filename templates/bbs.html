@@ -205,11 +205,10 @@
     </div>
 
     <script>
-        const API_BASE_URL = "https://server-bbs.vercel.app"; 
         let lastFetchedCount = 0; 
         const REFRESH_INTERVAL = 5000; 
         
-        const POST_COOLDOWN_MS = 5000; // 5秒のクールダウン
+        const POST_COOLDOWN_MS = 5000; 
         let lastPostTime = 0;
         
         function escapeHTML(str) {
@@ -235,9 +234,14 @@
             }
 
             try {
-                const response = await fetch(`${API_BASE_URL}/posts`);
+                const response = await fetch(`/api/bbs/posts`);
                 if (!response.ok) {
-                    const errorDetails = await response.json();
+                    let errorDetails = { detail: `HTTP ${response.status} エラー` };
+                    try {
+                        errorDetails = await response.json();
+                    } catch (e) {
+                        
+                    }
                     throw new Error(errorDetails.detail || `HTTP ${response.status} エラー`);
                 }
                 
@@ -334,13 +338,11 @@
                 return;
             }
             
-            // 文字数制限のチェック
             if (body.length > 200) {
                 alert(`本文は200文字以下にしてください。現在 ${body.length} 文字です。`);
                 return;
             }
             
-            // 連投防止のチェック
             const now = Date.now();
             if (now - lastPostTime < POST_COOLDOWN_MS) {
                 const remainingSeconds = ((lastPostTime + POST_COOLDOWN_MS - now) / 1000).toFixed(1);
@@ -352,7 +354,7 @@
             submitButton.textContent = '送信中...';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/post`, {
+                const response = await fetch(`/api/bbs/post`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -361,7 +363,12 @@
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json();
+                    let errorData = { detail: `投稿エラー: ${response.status}` };
+                    try {
+                        errorData = await response.json();
+                    } catch (e) {
+                        
+                    }
                     throw new Error(errorData.detail || `投稿エラー: ${response.status}`);
                 }
 
@@ -369,13 +376,13 @@
                 
                 bodyInput.value = '';
 
-                lastPostTime = Date.now(); // 投稿成功時に時間を更新
+                lastPostTime = Date.now(); 
                 
                 await fetchPosts(true);
 
             } catch (error) {
                 console.error("投稿処理エラー:", error);
-                alert(`投稿に失敗しました: ${error.message}`); // 失敗した場合もユーザーに通知
+                alert(`投稿に失敗しました: ${error.message}`); 
                 
             } finally {
                 submitButton.disabled = false;
