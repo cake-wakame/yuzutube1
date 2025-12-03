@@ -33,6 +33,7 @@ EDU_STREAM_API_BASE_URL = "https://siawaseok.duckdns.org/api/stream/"
 EDU_VIDEO_API_BASE_URL = "https://siawaseok.duckdns.org/api/video2/"
 STREAM_YTDL_API_BASE_URL = "https://yudlp-b34c.onrender.com/stream/" 
 SHORT_STREAM_API_BASE_URL = "https://yt-dl-kappa.vercel.app/short/"
+BBS_EXTERNAL_API_BASE_URL = "https://server-bbs.vercel.app"
 
 
 invidious_api_data = {
@@ -447,6 +448,42 @@ async def fetch_short_data_from_external_api(channelid: str) -> Dict[str, Any]:
 
     return await run_in_threadpool(sync_fetch)
 
+async def fetch_bbs_posts():
+    target_url = f"{BBS_EXTERNAL_API_BASE_URL}/posts"
+    
+    def sync_fetch():
+        res = requests.get(
+            target_url, 
+            headers=getRandomUserAgent(), 
+            timeout=max_api_wait_time
+        )
+        res.raise_for_status()
+        return res.json()
+
+    return await run_in_threadpool(sync_fetch)
+
+# 失敗しそう
+async def post_new_message(client_ip: str, name: str, body: str): # ★ client_ipを引数に追加
+    target_url = f"{BBS_EXTERNAL_API_BASE_URL}/post"
+    
+    def sync_post():
+        # クライアントIPをX-Forwarded-Forヘッダーに設定して外部BBSサーバーへ転送
+        headers = {
+            **getRandomUserAgent(), 
+            "X-Forwarded-For": client_ip 
+        }
+        
+        res = requests.post(
+            target_url, 
+            json={"name": name, "body": body},
+            headers=headers,
+            timeout=max_api_wait_time
+        )
+        res.raise_for_status()
+        return res.json()
+
+    return await run_in_threadpool(sync_post)
+
 
 app = FastAPI()
 invidious_api = InvidiousAPI() 
@@ -561,6 +598,46 @@ async def get_short_data_route(channelid: str):
             media_type="application/json", 
             status_code=503
         )
+
+@app.get("/api/bbs/posts")
+async def get_bbs_posts_route():
+    try:
+        posts_data = await fetch_bbs_posts()
+        return posts_data
+    except requests.exceptions.HTTPError as e:
+        status_code = e.response.status_code
+        return Response(content=e.response.text, media_type="application/json", status_code=status_code)
+    except requests.exceptions.RequestException as e:
+        return Response(content=f'{{"detail": "BBS API connection error or timeout: {e!r}"}}', media_type="application/json", status_code=503)
+    except Exception as e:
+        return Response(content=f'{{"detail": "An unexpected error occurred: {e!r}"}}', media_type="application/json", status_code=500)
+
+
+@app.post("/api/bbs/post")
+async def post_new_message_route(request: Request):
+    try:
+        # ★ FastAPI側でクライアントIPを取得
+        client_ip = request.headers.get("x-forwarded-for", "unknown").split(',')[0].strip()
+        
+        data = await request.json()
+        name = data.get("name", "")
+        body = data.get("body", "")
+        
+        if not body:
+            return Response(content='{"detail": "Body is required"}', media_type="application/json", status_code=400)
+
+        # 投稿処理を外部APIに委譲し、FastAPI側で取得したclient_ipを渡す
+        post_response = await post_new_message(client_ip, name, body)
+        return post_response
+        
+    except requests.exceptions.HTTPError as e:
+        status_code = e.response.status_code
+        # 外部APIのエラーをクライアントに返す
+        return Response(content=e.response.text, media_type="application/json", status_code=status_code)
+    except requests.exceptions.RequestException as e:
+        return Response(content=f'{{"detail": "BBS API connection error or timeout: {e!r}"}}', media_type="application/json", status_code=503)
+    except Exception as e:
+        return Response(content=f'{{"detail": "An unexpected error occurred: {e!r}"}}', media_type="application/json", status_code=500)
 
 
 @app.get('/', response_class=HTMLResponse)
