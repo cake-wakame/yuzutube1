@@ -343,7 +343,7 @@
             
         </form>
 
-        <h2>投稿一覧</h2>
+        <h2>稿一覧</h2>
         <div id="posts-container">
             <p id="loading-message">投稿を読み込み中...</p>
         </div>
@@ -362,7 +362,7 @@
         // クールダウンメッセージを表示する関数
         function showCooldownMessage(remainingSeconds) {
             const messageElement = document.getElementById('cooldown-message');
-            messageElement.textContent = `${remainingSeconds}秒待ってください。`;
+            messageElement.textContent = `あと${remainingSeconds}秒待ってください。`;
             messageElement.classList.add('visible');
             
             // 3秒後に非表示にする
@@ -407,8 +407,12 @@
                 }
                 
                 const data = await response.json();
-                // APIが最新順(降順)で返すことを想定。
-                const posts = data.posts || []; 
+                
+                let posts = data.posts || []; 
+
+                // 【✅ 修正点 1】 投稿番号を古い順にするため、まず配列を時間順（昇順＝古い順）にソートする
+                posts.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
                 const currentCount = posts.length;
 
                 if (!forceRefresh && currentCount === lastFetchedCount && lastFetchedCount !== 0) {
@@ -425,9 +429,18 @@
                 container.innerHTML = '';
                 
                 
-                posts.forEach((post, index) => {
-                    // 投稿番号は最新から順に No.1, No.2 となる
+                // 【✅ 修正点 2】 投稿を格納する一時配列を作成し、番号を振る
+                const numberedPosts = posts.map((post, index) => {
+                    // 古い順に No.1, No.2 となる
                     const postNumber = index + 1; 
+                    return { ...post, number: postNumber };
+                });
+
+                // 【✅ 修正点 3】 表示は最新のものが上になるように、番号を振った配列を逆順にする
+                const reversedPosts = numberedPosts.reverse();
+
+                reversedPosts.forEach((post) => {
+                    const postNumber = post.number; // 古い順に振られた番号を使用
 
                     const postElement = document.createElement('div');
                     postElement.classList.add('post');
@@ -455,6 +468,7 @@
                         </div>
                         <div class="post-body">${safeBody}</div>
                     `;
+                    // reversedPosts は最新順なので、appendChildで追加すると最新のものが一番上に表示される
                     container.appendChild(postElement);
                 });
 
@@ -563,15 +577,4 @@
                 alert(`投稿に失敗しました: ${error.message}`); 
                 
             } finally {
-                isSubmitting = false; 
-                submitButton.disabled = false;
-                // ボタンの表示を元に戻す際にアイコンも戻す
-                submitButton.innerHTML = '投稿<span aria-hidden="true">&#10148;</span>';
-            }
-        }
-
-        document.getElementById('post-form').addEventListener('submit', submitPost);
-        startAutoRefresh();
-    </script>
-</body>
-</html>
+              
