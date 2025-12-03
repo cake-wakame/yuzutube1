@@ -23,6 +23,7 @@
             --id-color: #dc3545;             /* 赤系 (ID強調) */
             --error-color: #dc3545;
             --message-bg: #fff0f0;
+            --input-focus-shadow: rgba(0, 123, 255, 0.5);
         }
         
         /* ======================================================= */
@@ -43,6 +44,7 @@
                 --id-color: #ff7f7f;
                 --error-color: #ff7f7f;
                 --message-bg: #3c2a2a;
+                --input-focus-shadow: rgba(108, 172, 235, 0.5);
             }
         }
 
@@ -60,12 +62,12 @@
             min-height: 100vh;
             background-color: var(--background-color);
             color: var(--text-color);
-            padding: 20px; /* 全体的にパディングを調整 */
+            padding: 20px; 
             transition: background-color 0.4s, color 0.4s;
         }
         
         .container {
-            max-width: 960px; /* PCでの表示幅を少し広げる */
+            max-width: 960px; 
             margin: 0 auto;
             background: var(--container-bg);
             padding: 30px;
@@ -106,6 +108,16 @@
             transition: background 0.4s;
         }
 
+        /* 入力グループ (UI強化) */
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px; /* 内部の隙間 */
+            padding: 10px;
+            border: 1px dashed var(--border-color); /* グループの視覚的な区切り */
+            border-radius: 5px;
+        }
+        
         /* 入力フィールド */
         #post-form input[type="text"], 
         #post-form textarea {
@@ -116,11 +128,12 @@
             background: var(--container-bg);
             color: var(--text-color);
             transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
+            width: 100%; /* グループ内で全幅 */
         }
         #post-form input[type="text"]:focus, 
         #post-form textarea:focus {
             border-color: var(--primary-color);
-            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+            box-shadow: 0 0 5px var(--input-focus-shadow);
             outline: none;
         }
         #post-form textarea {
@@ -128,7 +141,7 @@
             min-height: 120px;
         }
 
-        /* 投稿ボタン */
+        /* 投稿ボタン (UI強化: アイコンのスペース確保) */
         #post-form button {
             padding: 12px 20px;
             background-color: var(--primary-color);
@@ -139,6 +152,13 @@
             font-size: 17px;
             font-weight: 700;
             transition: background-color 0.3s, transform 0.1s, opacity 0.3s;
+            display: flex; /* アイコン配置のため */
+            align-items: center;
+            justify-content: center;
+        }
+        #post-form button span {
+            margin-left: 8px; /* アイコンとテキストの間隔 */
+            font-size: 1.2em;
         }
         #post-form button:hover:not(:disabled) {
             background-color: var(--primary-hover);
@@ -151,7 +171,7 @@
             opacity: 0.7;
         }
         
-        /* 投稿エリア */
+        /* 投稿エリア (変更なし) */
         #posts-container {
             display: flex;
             flex-direction: column; 
@@ -175,7 +195,7 @@
         .post-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start; /* 縦方向の配置を調整 */
+            align-items: flex-start;
             margin-bottom: 10px;
             padding-bottom: 8px;
             border-bottom: 1px solid var(--border-color);
@@ -192,7 +212,6 @@
             font-weight: 700;
             color: var(--text-color);
             flex-grow: 1;
-            /* 名前が長すぎた場合の処理 */
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -220,15 +239,7 @@
             display: block;
         }
 
-        /* メッセージエリア */
-        #loading-message, #empty-message {
-            text-align: center;
-            color: var(--info-text);
-            padding: 30px;
-            font-style: italic;
-        }
-
-        /* クールダウンメッセージ */
+        /* クールダウンメッセージ (変更なし) */
         #cooldown-message {
             position: fixed;
             top: 20px;
@@ -252,7 +263,7 @@
             transform: translateY(0);
         }
 
-        /* チェックボックス */
+        /* チェックボックスとラベル (変更なし) */
         #enable-enter-submit {
             transform: scale(1.0);
             cursor: pointer;
@@ -272,33 +283,20 @@
             }
             .container {
                 padding: 15px;
-                border-radius: 0; /* スマホでは全幅を使う */
+                border-radius: 0; 
                 box-shadow: none;
             }
-            h1 {
-                font-size: 1.8em;
-                margin-bottom: 20px;
-            }
-            h2 {
-                font-size: 1.2em;
-            }
-            
-            /* 投稿ヘッダーを縦並びにする */
             .post-header {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 5px;
             }
-            .post-number {
-                font-size: 1em;
-            }
             .post-name {
-                font-size: 1em;
-                white-space: normal; /* 折り返しを許可 */
+                white-space: normal; 
                 overflow: visible;
                 text-overflow: clip;
                 width: 100%;
-                order: 2; /* 順番を少し下げる */
+                order: 2; 
             }
             .post-info {
                 text-align: left;
@@ -326,15 +324,23 @@
 
         <form id="post-form">
             <h2>メッセージを投稿</h2>
-            <input type="text" id="name" placeholder="名前">
-            <textarea id="body" placeholder="本文" required></textarea>
             
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" id="enable-enter-submit" checked>
-                <label for="enable-enter-submit">Enterキーで送信を有効にする (Shift+Enterで改行)</label>
+            <div class="input-group">
+                <input type="text" id="name" placeholder="名前">
+                <textarea id="body" placeholder="本文" required></textarea>
             </div>
             
-            <button type="submit">投稿</button>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 5px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="enable-enter-submit" checked>
+                    <label for="enable-enter-submit">Enterキーで送信</label>
+                </div>
+                
+                <button type="submit">
+                    投稿
+                    <span aria-hidden="true">&#10148;</span> </button>
+            </div>
+            
         </form>
 
         <h2>投稿一覧</h2>
@@ -356,7 +362,7 @@
         // クールダウンメッセージを表示する関数
         function showCooldownMessage(remainingSeconds) {
             const messageElement = document.getElementById('cooldown-message');
-            messageElement.textContent = `あと ${remainingSeconds}秒 投稿できません。`;
+            messageElement.textContent = `${remainingSeconds}秒待ってください。`;
             messageElement.classList.add('visible');
             
             // 3秒後に非表示にする
@@ -401,8 +407,8 @@
                 }
                 
                 const data = await response.json();
-                // 投稿は最新のものが上になるように逆順にする
-                const posts = (data.posts || []).reverse(); 
+                // APIが最新順(降順)で返すことを想定。
+                const posts = data.posts || []; 
                 const currentCount = posts.length;
 
                 if (!forceRefresh && currentCount === lastFetchedCount && lastFetchedCount !== 0) {
@@ -418,10 +424,10 @@
 
                 container.innerHTML = '';
                 
-                const totalPosts = posts.length;
                 
                 posts.forEach((post, index) => {
-                    const postNumber = totalPosts - index; 
+                    // 投稿番号は最新から順に No.1, No.2 となる
+                    const postNumber = index + 1; 
 
                     const postElement = document.createElement('div');
                     postElement.classList.add('post');
@@ -455,7 +461,7 @@
             } catch (error) {
                 console.error("投稿の読み込みエラー:", error);
                 container.innerHTML = `<p style="color: var(--error-color); background: var(--message-bg); border-radius: 6px; padding: 20px; border: 1px solid var(--error-color);">
-                    投稿の読み込みに失敗しました: ${error.message}
+                    🚨 投稿の読み込みに失敗しました: ${error.message}
                 </p>`;
             }
         }
@@ -522,7 +528,7 @@
 
             isSubmitting = true;
             submitButton.disabled = true;
-            submitButton.textContent = '送信中...';
+            submitButton.innerHTML = '送信中...';
 
             try {
                 // 仮のAPIパス。実際の実装に合わせて変更してください。
@@ -559,7 +565,8 @@
             } finally {
                 isSubmitting = false; 
                 submitButton.disabled = false;
-                submitButton.textContent = '投稿';
+                // ボタンの表示を元に戻す際にアイコンも戻す
+                submitButton.innerHTML = '投稿<span aria-hidden="true">&#10148;</span>';
             }
         }
 
