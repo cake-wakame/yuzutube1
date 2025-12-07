@@ -601,7 +601,7 @@
             }
 
             try {
-                const response = await fetch(`/posts`); 
+                const response = await fetch(`/api/bbs/posts`); 
                 if (!response.ok) {
                     let errorDetails = { detail: `HTTP ${response.status} エラー` };
                     try {
