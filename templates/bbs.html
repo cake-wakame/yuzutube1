@@ -651,7 +651,7 @@
                     const bodyContent = post.body || "";
                     const bodyTextOnly = post.body_text_only || "";
                     
-                    // Base64データは表示前に再度、厳格に検証
+                    
                     const isBodyImage = isBase64Image(bodyContent);
                     
                     const headerHtml = `
@@ -682,7 +682,7 @@
                         postElement.appendChild(bodyDiv);
                     }
                     
-                    // 画像コンテンツの挿入（厳格なBase64検証済みデータのみ）
+                    
                     if (isBodyImage) {
                         const img = document.createElement('img');
                         img.src = bodyContent;
