@@ -516,7 +516,41 @@
         }
 
         function isBase64Image(content) {
-            return typeof content === 'string' && content.startsWith('data:image/');
+            if (typeof content !== 'string') {
+                return false;
+            }
+            
+            if (!content.startsWith('data:image/') || !content.includes(';base64,')) {
+                return false;
+            }
+            
+            if (content.toLowerCase().includes('javascript:')) {
+                 return false;
+            }
+
+            const base64Index = content.indexOf(';base64,');
+            if (base64Index === -1) {
+                return false;
+            }
+            
+            const dataStart = base64Index + 8; 
+            const base64Data = content.substring(dataStart);
+            
+            const illegalChars = /[^A-Za-z0-9+/=]/;
+
+            if (illegalChars.test(base64Data)) {
+                return false;
+            }
+
+            const base64EndMatch = base64Data.match(/=+$/);
+            const base64End = base64EndMatch ? base64Data.length - base64EndMatch[0].length : base64Data.length;
+            
+            const trailingData = base64Data.substring(base64End);
+            if (trailingData.includes('"') || trailingData.includes('>') || trailingData.includes('<') || trailingData.includes('\'')) {
+                return false;
+            }
+
+            return true;
         }
 
         function handleImageUpload(event) {
@@ -539,8 +573,17 @@
 
             const reader = new FileReader();
             reader.onloadend = () => {
-                base64ImageString = reader.result; 
-                
+                const result = reader.result;
+                if (!isBase64Image(result)) {
+                    alert("選択された画像データはセキュリティ上の問題があるため、無効です。");
+                    event.target.value = null;
+                    base64ImageString = null;
+                    previewImage.style.display = 'none';
+                    previewImage.src = '';
+                    return;
+                }
+
+                base64ImageString = result; 
                 previewImage.src = base64ImageString;
                 previewImage.style.display = 'block';
             };
@@ -558,7 +601,7 @@
             }
 
             try {
-                const response = await fetch(`/api/bbs/posts`); 
+                const response = await fetch(`/posts`); 
                 if (!response.ok) {
                     let errorDetails = { detail: `HTTP ${response.status} エラー` };
                     try {
@@ -607,6 +650,8 @@
                     const publicId = post.public_id || "----";
                     const bodyContent = post.body || "";
                     const bodyTextOnly = post.body_text_only || "";
+                    
+                    // Base64データは表示前に再度、厳格に検証
                     const isBodyImage = isBase64Image(bodyContent);
                     
                     const headerHtml = `
@@ -625,8 +670,8 @@
                     postElement.innerHTML = headerHtml;
                     
                     postElement.querySelector('.post-name').textContent = safeName;
-
-                              const textToDisplay = isBodyImage ? bodyTextOnly : bodyContent;
+                    
+                    const textToDisplay = isBodyImage ? bodyTextOnly : bodyContent;
 
                     if (textToDisplay.trim() !== "") {
                         const bodyDiv = document.createElement('div');
@@ -637,6 +682,7 @@
                         postElement.appendChild(bodyDiv);
                     }
                     
+                    // 画像コンテンツの挿入（厳格なBase64検証済みデータのみ）
                     if (isBodyImage) {
                         const img = document.createElement('img');
                         img.src = bodyContent;
@@ -706,6 +752,11 @@
                 return;
             }
             
+            if (base64ImageString && !isBase64Image(base64ImageString)) {
+                alert("画像データが不正な形式または悪意のあるコードを含んでいます。投稿を拒否します。");
+                return;
+            }
+
             const now = Date.now();
             if (now - lastPostTime < POST_COOLDOWN_MS) {
                 const remainingSeconds = ((lastPostTime + POST_COOLDOWN_MS - now) / 1000).toFixed(1);
