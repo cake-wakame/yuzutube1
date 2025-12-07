@@ -4,39 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>掲示板</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #007bff;
-            --primary-hover: #0056b3;
-            --background-color: #f4f7f6;
+            --primary-color: #3f51b5; /* Indigo */
+            --primary-hover: #303f9f;
+            --background-color: #e8eaf6; /* Light Lavender */
             --container-bg: #ffffff;
-            --form-bg: #e9ecef;
-            --text-color: #212529;
-            --secondary-text: #495057;
-            --border-color: #ced4da;
-            --post-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            --info-text: #6c757d;
-            --id-color: #dc3545;
-            --error-color: #dc3545;
-            --message-bg: #fff0f0;
+            --form-bg: #f5f5f5;
+            --text-color: #212121;
+            --secondary-text: #616161;
+            --border-color: #bdbdbd;
+            --post-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+            --info-text: #9e9e9e;
+            --id-color: #e91e63; /* Pink */
+            --error-color: #f44336;
+            --message-bg: #ffebee;
+            --radius: 8px;
         }
         
         @media (prefers-color-scheme: dark) {
             :root {
-                --primary-color: #6caceb;
-                --primary-hover: #4a8ac2;
-                --background-color: #121212;
-                --container-bg: #1e1e1e;
-                --form-bg: #2d2d2d;
+                --primary-color: #7986cb;
+                --primary-hover: #5c6bc0;
+                --background-color: #1a1a2e;
+                --container-bg: #2c3a47;
+                --form-bg: #3c4b57;
                 --text-color: #e0e0e0;
                 --secondary-text: #b0b0b0;
-                --border-color: #444444;
-                --post-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-                --info-text: #999999;
-                --id-color: #ff7f7f;
-                --error-color: #ff7f7f;
-                --message-bg: #3c2a2a;
+                --border-color: #555555;
+                --post-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+                --info-text: #9e9e9e;
+                --id-color: #ff80ab;
+                --error-color: #ff5252;
+                --message-bg: #4c3c5c;
             }
         }
 
@@ -47,11 +48,11 @@
         }
 
         body {
-            font-family: 'Noto Sans JP', sans-serif;
+            font-family: 'Noto Sans JP', 'Roboto', sans-serif;
             min-height: 100vh;
             background-color: var(--background-color);
             color: var(--text-color);
-            padding: 20px;
+            padding: 30px 20px;
             transition: background-color 0.4s, color 0.4s;
         }
         
@@ -59,9 +60,9 @@
             max-width: 960px;
             margin: 0 auto;
             background: var(--container-bg);
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: var(--post-shadow);
+            padding: 40px;
+            border-radius: var(--radius);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             transition: background 0.4s, box-shadow 0.4s;
         }
 
@@ -69,37 +70,38 @@
             color: var(--primary-color);
             text-align: center;
             font-weight: 700;
-            padding-bottom: 15px;
-            margin-bottom: 25px;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
             border-bottom: 3px solid var(--primary-color);
-            font-size: 2em;
+            font-size: 2.2em;
         }
 
         h2 {
             color: var(--text-color);
             font-weight: 700;
-            margin-bottom: 15px;
-            font-size: 1.4em;
-            border-left: 4px solid var(--primary-color);
-            padding-left: 10px;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-left: 5px solid var(--primary-color);
+            padding-left: 12px;
         }
 
         #post-form {
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            margin-bottom: 30px;
-            padding: 20px;
+            gap: 18px;
+            margin-bottom: 40px;
+            padding: 25px;
             background: var(--form-bg);
-            border-radius: 8px;
+            border-radius: var(--radius);
+            box-shadow: var(--post-shadow);
             transition: background 0.4s;
         }
 
         #post-form input[type="text"], 
         #post-form textarea {
-            padding: 12px;
+            padding: 14px 12px;
             border: 1px solid var(--border-color);
-            border-radius: 5px;
+            border-radius: 6px;
             font-size: 16px;
             background: var(--container-bg);
             color: var(--text-color);
@@ -108,85 +110,105 @@
         #post-form input[type="text"]:focus, 
         #post-form textarea:focus {
             border-color: var(--primary-color);
-            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+            box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.2);
             outline: none;
         }
         #post-form textarea {
             resize: vertical;
-            min-height: 120px;
+            min-height: 100px;
         }
         
         .file-upload-group {
             display: flex;
-            flex-direction: column;
-            gap: 10px;
+            align-items: center;
+            gap: 20px;
+            padding: 10px 0;
+        }
+        #image-file-input {
+            padding: 0;
         }
         #preview-image {
-            max-width: 100px;
+            max-width: 80px;
             height: auto;
             border: 1px solid var(--border-color);
             border-radius: 4px;
             object-fit: contain;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
         #post-form button {
-            padding: 12px 20px;
+            padding: 14px 25px;
             background-color: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 17px;
+            font-size: 18px;
             font-weight: 700;
             transition: background-color 0.3s, transform 0.1s, opacity 0.3s;
+            letter-spacing: 0.5px;
         }
         #post-form button:hover:not(:disabled) {
             background-color: var(--primary-hover);
-            transform: translateY(-1px);
+            transform: translateY(-2px);
         }
         #post-form button:disabled {
             background-color: var(--border-color);
             color: var(--secondary-text);
             cursor: not-allowed;
-            opacity: 0.7;
+            opacity: 0.8;
+        }
+        
+        .settings-group {
+            display: flex; 
+            align-items: center; 
+            gap: 10px;
+            font-size: 14px;
+        }
+        #enable-enter-submit {
+            cursor: pointer;
+            accent-color: var(--primary-color);
+        }
+        #post-form label {
+            color: var(--secondary-text);
+            font-size: 14px;
         }
         
         #posts-container {
             display: flex;
             flex-direction: column; 
-            gap: 15px;
-            margin-top: 20px;
+            gap: 25px;
+            padding-top: 10px;
         }
         .post {
             background-color: var(--container-bg);
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            border-left: 4px solid var(--primary-color);
-            transition: transform 0.2s, box-shadow 0.2s, background 0.4s;
+            border-radius: var(--radius);
+            box-shadow: var(--post-shadow);
+            border-left: 5px solid var(--primary-color);
+            transition: box-shadow 0.3s, background 0.4s;
         }
         .post:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.12);
         }
 
         .post-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--form-bg);
         }
         .post-number {
-            font-size: 1.1em;
+            font-size: 1.2em;
             font-weight: 700;
             color: var(--primary-color);
             margin-right: 15px;
             flex-shrink: 0;
         }
         .post-name {
-            font-size: 1.05em;
+            font-size: 1.1em;
             font-weight: 700;
             color: var(--text-color);
             flex-grow: 1;
@@ -197,23 +219,40 @@
         
         .post-info {
             text-align: right;
-            font-size: 0.8em;
+            font-size: 0.85em;
             color: var(--info-text);
             line-height: 1.4;
             flex-shrink: 0;
-            margin-left: 15px;
+            margin-left: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
         }
+        
+        .reply-button {
+            font-size: 0.9em;
+            color: var(--info-text); 
+            cursor: pointer;
+            text-decoration: none;
+            transition: color 0.2s;
+            font-weight: 600;
+        }
+        .reply-button:hover {
+            color: var(--primary-color);
+        }
+        
         .post-body {
             white-space: pre-wrap;
             word-wrap: break-word;
-            line-height: 1.6;
+            line-height: 1.7;
             color: var(--secondary-text);
             font-size: 16px;
+            margin-bottom: 10px;
         }
         .public-id {
             font-weight: 600;
             color: var(--id-color);
-            font-family: monospace;
+            font-family: 'Roboto Mono', monospace;
             display: block;
         }
         
@@ -221,16 +260,18 @@
             max-width: 100%;
             height: auto;
             margin-top: 10px;
-            border-radius: 4px;
+            border-radius: 6px;
             border: 1px solid var(--border-color);
             cursor: zoom-in;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         #loading-message, #empty-message {
             text-align: center;
             color: var(--info-text);
-            padding: 30px;
+            padding: 40px;
             font-style: italic;
+            font-size: 1.1em;
         }
 
         #cooldown-message {
@@ -240,9 +281,9 @@
             background-color: var(--message-bg);
             color: var(--error-color);
             border: 1px solid var(--error-color);
-            padding: 12px 18px;
+            padding: 15px 20px;
             border-radius: 6px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
             z-index: 1000;
             opacity: 0;
             visibility: hidden;
@@ -256,40 +297,82 @@
             transform: translateY(0);
         }
 
-        #enable-enter-submit {
-            transform: scale(1.0);
-            cursor: pointer;
-            accent-color: var(--primary-color);
-        }
-        #post-form label {
-            color: var(--secondary-text);
-            font-size: 14px;
+        /* モーダル（拡大画像）のスタイル */
+        #image-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000; 
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.95); 
+            animation: fadeIn 0.3s;
         }
 
+        #modal-content {
+            margin: auto;
+            display: block;
+            width: 95%;
+            max-width: 1400px; 
+            max-height: 95vh;
+            object-fit: contain;
+            user-select: none; 
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 6px;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 45px;
+            color: #ffffff;
+            font-size: 50px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .modal-close:hover,
+        .modal-close:focus {
+            color: var(--primary-color);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0 } 
+            to { opacity: 1 }
+        }
+
+        /* レスポンシブデザイン */
         @media (max-width: 600px) {
             body {
                 padding: 10px;
             }
             .container {
-                padding: 15px;
+                padding: 20px;
                 border-radius: 0;
                 box-shadow: none;
             }
             h1 {
                 font-size: 1.8em;
-                margin-bottom: 20px;
+                margin-bottom: 25px;
             }
-            h2 {
-                font-size: 1.2em;
+            #post-form {
+                padding: 15px;
             }
-            
             .post-header {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 5px;
+                gap: 8px;
             }
             .post-number {
-                font-size: 1em;
+                font-size: 1.1em;
+                order: 1;
             }
             .post-name {
                 font-size: 1em;
@@ -304,8 +387,10 @@
                 margin-left: 0;
                 width: 100%;
                 order: 3;
+                justify-content: space-between;
+                padding-top: 5px;
             }
-            .post-number {
+            .reply-button {
                 order: 1;
             }
             #cooldown-message {
@@ -314,6 +399,12 @@
                 right: 10px;
                 left: 10px;
                 text-align: center;
+                font-size: 0.9em;
+            }
+            .modal-close {
+                top: 5px;
+                right: 15px;
+                font-size: 40px;
             }
         }
     </style>
@@ -326,14 +417,14 @@
         <form id="post-form">
             <h2>メッセージを投稿</h2>
             <input type="text" id="name" placeholder="名前">
-            <textarea id="body" placeholder="本文" required></textarea>
+            <textarea id="body" placeholder="本文 (画像のみの投稿も可能です)"></textarea>
             
             <div class="file-upload-group">
                 <input type="file" id="image-file-input" accept="image/*">
                 <img id="preview-image" style="display: none;" alt="プレビュー画像">
             </div>
 
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="settings-group">
                 <input type="checkbox" id="enable-enter-submit" checked>
                 <label for="enable-enter-submit">Enterキーで送信を有効にする (Shift+Enterで改行)</label>
             </div>
@@ -347,7 +438,12 @@
         </div>
     </div>
     
-    <div id="cooldown-message" class=""></div>
+    <div id="cooldown-message"></div>
+    
+    <div id="image-modal">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <img id="modal-content">
+    </div>
 
     <script>
         let lastFetchedCount = 0; 
@@ -365,6 +461,51 @@
         const bodyInput = document.getElementById('body');
         const postForm = document.getElementById('post-form');
         const submitButton = document.querySelector('#post-form button');
+        
+        const imageModal = document.getElementById('image-modal');
+        const modalContent = document.getElementById('modal-content');
+
+        
+        function openModal(imageSrc) {
+            modalContent.src = imageSrc;
+            imageModal.style.display = "block";
+        }
+
+        function closeModal() {
+            imageModal.style.display = "none";
+            modalContent.src = "";
+        }
+        
+        imageModal.onclick = function(event) {
+            if (event.target === imageModal) {
+                closeModal();
+            }
+        }
+        
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && imageModal.style.display === "block") {
+                closeModal();
+            }
+        });
+        
+        function replyToPost(postNumber) {
+            const replyText = `>>${postNumber} `;
+            const bodyTextarea = document.getElementById('body');
+            
+            const start = bodyTextarea.selectionStart;
+            const end = bodyTextarea.selectionEnd;
+
+            const currentValue = bodyTextarea.value;
+            
+            const newValue = replyText + currentValue.substring(0, start) + currentValue.substring(end);
+            
+            bodyTextarea.value = newValue;
+            
+            const newCursorPosition = replyText.length + start;
+            bodyTextarea.selectionStart = bodyTextarea.selectionEnd = newCursorPosition;
+            
+            bodyTextarea.focus();
+        }
 
         function showCooldownMessage(remainingSeconds) {
             const messageElement = document.getElementById('cooldown-message');
@@ -433,7 +574,7 @@
             }
 
             try {
-                const response = await fetch(`/api/bbs/posts`); 
+                const response = await fetch(`/posts`); 
                 if (!response.ok) {
                     let errorDetails = { detail: `HTTP ${response.status} エラー` };
                     try {
@@ -480,24 +621,37 @@
                     
                     const safeName = escapeHTML(post.name || "名無し");
                     const bodyContent = post.body || "";
+                    const bodyTextOnly = post.body_text_only || "";
+                    
+                    const isBodyImage = isBase64Image(bodyContent);
 
                     let bodyHtml = '';
+                    let imageHtml = '';
+                    let textHtml = '';
 
-                    if (isBase64Image(bodyContent)) {
-                        // Base64画像の場合: 直接埋め込み表示
-                        bodyHtml = `<img src="${bodyContent}" alt="投稿画像" class="post-image" onclick="window.open(this.src)">`;
+                    if (isBodyImage) {
+                        imageHtml = `<img src="${bodyContent}" alt="投稿画像" class="post-image" onclick="openModal(this.src)">`;
+                        
+             if (bodyTextOnly.trim() !== "") {
+                            textHtml = `<div class="post-body">${escapeHTML(bodyTextOnly)}</div>`;
+                        }
                     } else {
-                        // 通常のテキストの場合
-                        bodyHtml = `<div class="post-body">${escapeHTML(bodyContent)}</div>`;
+                        textHtml = `<div class="post-body">${escapeHTML(bodyContent)}</div>`;
                     }
+                    
+                    bodyHtml = textHtml + imageHtml;
+
 
                     postElement.innerHTML = `
                         <div class="post-header">
                             <span class="post-number">No.${postNumber}</span>
                             <span class="post-name">${safeName}</span>
                             <div class="post-info">
-                                <span>${formattedDate}</span>
-                                <span class="public-id">#${post.public_id}</span>
+                                <span class="reply-button" onclick="replyToPost(${postNumber})">返信</span>
+                                <div>
+                                    <span>${formattedDate}</span>
+                                    <span class="public-id">#${post.public_id}</span>
+                                </div>
                             </div>
                         </div>
                         ${bodyHtml}
@@ -574,7 +728,7 @@
             submitButton.textContent = '送信中...';
 
             try {
-                const response = await fetch(`/api/bbs/post`, { 
+                const response = await fetch(`/post`, { 
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
