@@ -1,7 +1,5 @@
 {
-  "template": "docker",
-  "container": {
-    "port": 3000,
-    "startScript": "start"
-  }
+  "infiniteLoopProtection": false,
+  "hardReloadOnChange": false,
+  "template": "node"
 }
