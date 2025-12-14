@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "description": "YuzuTube - Video Platform",
   "scripts": {
-    "start": "uvicorn app.main:app --host 0.0.0.0 --port 3000 --reload"
+    "start": "uvicorn app.main:app --host=0.0.0.0 --port=3000 --reload"
   }
 }
