@@ -8,7 +8,7 @@
   "tasks": {
     "dev": {
       "name": "Development Server",
-      "command": "uvicorn app.main:app --host 0.0.0.0 --port $PORT --reload",
+      "command": "uvicorn app.main:app --host 0.0.0.0 --port 3000 --reload",
       "runAtStart": true,
       "preview": {
         "port": 3000
@@ -16,7 +16,7 @@
     },
     "start": {
       "name": "Start Server",
-      "command": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
+      "command": "uvicorn app.main:app --host 0.0.0.0 --port 3000",
       "preview": {
         "port": 3000
       }
